@@ -1,0 +1,286 @@
+export const statsData = [
+  {
+    id: "revenue",
+    title: "Pendapatan Bulan Ini",
+    value: "Rp 45,2 Juta",
+    subtitle: "1.234 transaksi",
+    trend: +12.5,
+    icon: "trending-up",
+    highlight: true,
+  },
+  {
+    id: "customers",
+    title: "Total Pelanggan",
+    value: "969",
+    subtitle: "666 pelanggan aktif",
+    trend: +8.1,
+    icon: "users",
+    highlight: false,
+  },
+  {
+    id: "products",
+    title: "Produk Aktif",
+    value: "18",
+    subtitle: "3 stok menipis",
+    trend: -2.3,
+    icon: "package",
+    highlight: false,
+  },
+  {
+    id: "transactions",
+    title: "Transaksi Hari Ini",
+    value: "156",
+    subtitle: "Rp 2,5 juta",
+    trend: +5.7,
+    icon: "shopping-cart",
+    highlight: false,
+  },
+];
+
+export const weeklyActivityData = [
+  { day: "Sen", income: 4200000, expense: 1200000 },
+  { day: "Sel", income: 3800000, expense: 900000 },
+  { day: "Rab", income: 5100000, expense: 1400000 },
+  { day: "Kam", income: 4700000, expense: 1100000 },
+  { day: "Jum", income: 6200000, expense: 1800000 },
+  { day: "Sab", income: 7500000, expense: 2100000 },
+  { day: "Min", income: 3100000, expense: 800000 },
+];
+
+export const salesTrendData = [
+  { month: "Jan", penjualan: 28000000 },
+  { month: "Feb", penjualan: 32000000 },
+  { month: "Mar", penjualan: 27000000 },
+  { month: "Apr", penjualan: 38000000 },
+  { month: "Mei", penjualan: 35000000 },
+  { month: "Jun", penjualan: 42000000 },
+  { month: "Jul", penjualan: 39000000 },
+  { month: "Agu", penjualan: 45000000 },
+  { month: "Sep", penjualan: 41000000 },
+  { month: "Okt", penjualan: 48000000 },
+  { month: "Nov", penjualan: 52000000 },
+  { month: "Des", penjualan: 45200000 },
+];
+
+export const paymentMethodData = [
+  { name: "Tunai", value: 42, color: "#FF6B00" },
+  { name: "Transfer Bank", value: 28, color: "#3B82F6" },
+  { name: "QRIS", value: 20, color: "#10B981" },
+  { name: "Kartu Debit", value: 10, color: "#8B5CF6" },
+];
+
+export const categoryData = [
+  { name: "Apparel",  value: 40, color: "#EF4444", barColor: "#FF6B00" },
+  { name: "Fan Gear", value: 30, color: "#1D4ED8", barColor: "#1D4ED8" },
+  { name: "Headwear", value: 18, color: "#FDBA74", barColor: "#22C55E" },
+  { name: "Footwear", value: 12, color: "#22C55E", barColor: "#F59E0B" },
+];
+
+export const recentTransactionsData = [
+  {
+    id: "TRX-001",
+    name: "Afrachi Gani",
+    date: "Hari ini, 14:23",
+    amount: 799000,
+    method: "QRIS",
+    initials: "AG",
+    color: "#FF6B00",
+  },
+  {
+    id: "TRX-002",
+    name: "Annastasia Yasmeen",
+    date: "Hari ini, 13:05",
+    amount: 603000,
+    method: "Tunai",
+    initials: "AY",
+    color: "#3B82F6",
+  },
+  {
+    id: "TRX-003",
+    name: "Wielino Septian",
+    date: "Hari ini, 11:47",
+    amount: 81000,
+    method: "Transfer",
+    initials: "WS",
+    color: "#10B981",
+  },
+  {
+    id: "TRX-004",
+    name: "Kesya Tamara",
+    date: "Kemarin, 17:30",
+    amount: 1250000,
+    method: "Kartu Debit",
+    initials: "KT",
+    color: "#8B5CF6",
+  },
+  {
+    id: "TRX-005",
+    name: "Reza Pratama",
+    date: "Kemarin, 15:12",
+    amount: 450000,
+    method: "QRIS",
+    initials: "RP",
+    color: "#F59E0B",
+  },
+];
+
+export const lowStockData = [
+  {
+    id: 1,
+    name: "Ferrari 261 T-Shirt",
+    category: "Apparel",
+    stock: 5,
+    maxStock: 50,
+    sku: "FRR-TS-261",
+  },
+  {
+    id: 2,
+    name: "Real Madrid Home 26/27",
+    category: "Apparel",
+    stock: 3,
+    maxStock: 40,
+    sku: "RM-HOME-2627",
+  },
+  {
+    id: 3,
+    name: "FC Barcelona UCL 25/26",
+    category: "Apparel",
+    stock: 8,
+    maxStock: 60,
+    sku: "BAR-UCL-2526",
+  },
+  {
+    id: 4,
+    name: "Ferrari Lego Technic",
+    category: "Fan Gear",
+    stock: 2,
+    maxStock: 20,
+    sku: "FRR-LGO-TCH",
+  },
+];
+
+export const topProductsData = [
+  {
+    rank: 1,
+    name: "Ferrari Baseball Jersey",
+    category: "Apparel",
+    sold: 248,
+    revenue: 49600000,
+    trend: +18,
+  },
+  {
+    rank: 2,
+    name: "Ferrari Lego Technic",
+    category: "Fan Gear",
+    sold: 192,
+    revenue: 115200000,
+    trend: +25,
+  },
+  {
+    rank: 3,
+    name: "Real Madrid Home 26/27",
+    category: "Apparel",
+    sold: 165,
+    revenue: 24750000,
+    trend: +11,
+  },
+  {
+    rank: 4,
+    name: "Ferrari Lego",
+    category: "Fan Gear",
+    sold: 134,
+    revenue: 40200000,
+    trend: -4,
+  },
+  {
+    rank: 5,
+    name: "FC Barcelona UCL 25/26",
+    category: "Apparel",
+    sold: 118,
+    revenue: 17700000,
+    trend: +7,
+  },
+];
+
+export const topCustomersData = [
+  {
+    rank: 1,
+    name: "Alfachri Gani",
+    totalOrders: 42,
+    totalSpent: 8400000,
+    initials: "AG",
+    color: "#FF6B00",
+  },
+  {
+    rank: 2,
+    name: "Wielino Septian",
+    totalOrders: 38,
+    totalSpent: 6840000,
+    initials: "WS",
+    color: "#3B82F6",
+  },
+  {
+    rank: 3,
+    name: "Kesya Tamara",
+    totalOrders: 29,
+    totalSpent: 5220000,
+    initials: "KT",
+    color: "#10B981",
+  },
+  {
+    rank: 4,
+    name: "Reza Pratama",
+    totalOrders: 24,
+    totalSpent: 4320000,
+    initials: "RP",
+    color: "#8B5CF6",
+  },
+];
+
+export const quickActionsData = [
+  {
+    id: "add-product",
+    label: "Tambah Produk",
+    icon: "package-plus",
+    bg: "bg-orange-50",
+    iconColor: "text-orange-500",
+    border: "border-orange-100",
+    href: "/products",
+  },
+  {
+    id: "manage-stock",
+    label: "Kelola Stok",
+    icon: "boxes",
+    bg: "bg-blue-50",
+    iconColor: "text-blue-500",
+    border: "border-blue-100",
+    href: "/products",
+  },
+  {
+    id: "add-customer",
+    label: "Tambah Pelanggan",
+    icon: "user-plus",
+    bg: "bg-green-50",
+    iconColor: "text-green-500",
+    border: "border-green-100",
+    href: "/customers",
+  },
+  {
+    id: "add-supplier",
+    label: "Tambah Supplier",
+    icon: "truck",
+    bg: "bg-purple-50",
+    iconColor: "text-purple-500",
+    border: "border-purple-100",
+    href: "/suppliers",
+  },
+  {
+    id: "integration",
+    label: "Integrasi",
+    icon: "link-2",
+    bg: "bg-yellow-50",
+    iconColor: "text-yellow-500",
+    border: "border-yellow-100",
+    href: "/settings",
+  },
+];
