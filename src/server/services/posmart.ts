@@ -1,5 +1,4 @@
 import bcrypt from "bcryptjs";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { ApiError } from "@/lib/api-response";
 import { toSessionUser, type SessionUser } from "@/lib/auth";
@@ -86,8 +85,8 @@ function maybePaginated<T>(items: T[], total: number, pagination: PaginationOpti
   };
 }
 
-function parseSortOrder(filters: URLSearchParams): Prisma.SortOrder {
-  const sortOrder = filters.get("sortOrder") ?? filters.get("sort_order") ?? "desc";
+function parseSortOrder(filters: URLSearchParams): "asc" | "desc" {
+  const sortOrder = (filters.get("sortOrder") ?? filters.get("sort_order") ?? "desc") as "asc" | "desc";
   if (sortOrder !== "asc" && sortOrder !== "desc") {
     throw new ApiError(400, "Parameter tidak valid", { sortOrder: "Gunakan asc atau desc" });
   }
@@ -237,9 +236,9 @@ export async function listOutlets(user: SessionUser, filters = new URLSearchPara
   const search = optionalSearch(filters);
   const sortBy = parseSortBy(filters, ["createdAt", "nama"] as const, "createdAt");
   const sortOrder = parseSortOrder(filters);
-  const where: Prisma.OutletWhereInput = {
+  const where = {
     userId: ownerId(user),
-    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" } }, { alamat: { contains: search, mode: "insensitive" } }] } : {}),
+    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" as const } }, { alamat: { contains: search, mode: "insensitive" as const } }] } : {}),
   };
   const [outlets, total] = await Promise.all([
     prisma.outlet.findMany({
@@ -282,9 +281,9 @@ export async function listCategories(user: SessionUser, filters = new URLSearchP
   const pagination = parsePagination(filters);
   const search = optionalSearch(filters);
   const sortOrder = parseSortOrder(filters);
-  const where: Prisma.CategoryWhereInput = {
+  const where = {
     ownerUserId: ownerId(user),
-    ...(search ? { nama: { contains: search, mode: "insensitive" } } : {}),
+    ...(search ? { nama: { contains: search, mode: "insensitive" as const } } : {}),
   };
   const [rows, total] = await Promise.all([
     prisma.category.findMany({
@@ -331,9 +330,9 @@ export async function listSuppliers(user: SessionUser, filters = new URLSearchPa
   const pagination = parsePagination(filters);
   const search = optionalSearch(filters);
   const sortOrder = parseSortOrder(filters);
-  const where: Prisma.SupplierWhereInput = {
+  const where = {
     ownerUserId: ownerId(user),
-    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" } }, { kontak: { contains: search, mode: "insensitive" } }] } : {}),
+    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" as const } }, { kontak: { contains: search, mode: "insensitive" as const } }] } : {}),
   };
   const [rows, total] = await Promise.all([
     prisma.supplier.findMany({
@@ -385,11 +384,11 @@ export async function listProducts(user: SessionUser, filters: URLSearchParams) 
   const sortOrder = parseSortOrder(filters);
 
   if (outletId) await ensureOutletAccess(numericId(outletId, "outletId"), user);
-  const where: Prisma.ProductWhereInput = {
+  const where = {
     outlet: { userId: ownerId(user) },
     ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
     ...(categoryId ? { categoryId: numericId(categoryId, "categoryId") } : {}),
-    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" } }, { sku: { contains: search, mode: "insensitive" } }] } : {}),
+    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" as const } }, { sku: { contains: search, mode: "insensitive" as const } }] } : {}),
   };
   const [rows, total] = await Promise.all([
     prisma.product.findMany({
@@ -449,11 +448,11 @@ export async function listInventory(user: SessionUser, filters: URLSearchParams)
   const sortOrder = parseSortOrder(filters);
   if (status && status !== "low_stock") throw new ApiError(400, "Parameter tidak valid", { status: "Gunakan low_stock jika ingin memfilter stok menipis" });
   if (outletId) await ensureOutletAccess(numericId(outletId, "outletId"), user);
-  const where: Prisma.InventoryWhereInput = {
+  const where = {
     outlet: { userId: ownerId(user) },
     ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
     ...(productId ? { productId: numericId(productId, "productId") } : {}),
-    ...(search ? { product: { nama: { contains: search, mode: "insensitive" } } } : {}),
+    ...(search ? { product: { nama: { contains: search, mode: "insensitive" as const } } } : {}),
   };
   const [rows, totalRows] = await Promise.all([
     prisma.inventory.findMany({
@@ -522,9 +521,9 @@ export async function listCustomers(user: SessionUser, filters = new URLSearchPa
   const search = optionalSearch(filters);
   const sortBy = parseSortBy(filters, ["nama"] as const, "nama");
   const sortOrder = parseSortOrder(filters);
-  const where: Prisma.CustomerWhereInput = {
+  const where = {
     ownerUserId: ownerId(user),
-    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" } }, { email: { contains: search, mode: "insensitive" } }, { telepon: { contains: search, mode: "insensitive" } }] } : {}),
+    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" as const } }, { email: { contains: search, mode: "insensitive" as const } }, { telepon: { contains: search, mode: "insensitive" as const } }] } : {}),
   };
   const [rows, total] = await Promise.all([
     prisma.customer.findMany({
@@ -579,7 +578,7 @@ export async function listTransactions(user: SessionUser, filters: URLSearchPara
   if (outletId) await ensureOutletAccess(numericId(outletId, "outletId"), user);
   if (metode && !["Tunai", "Transfer", "QRIS", "Kartu"].includes(metode)) throw new ApiError(400, "Parameter tidak valid", { metode: "Metode pembayaran tidak valid" });
   if (status && !["Sukses", "Pending", "Batal"].includes(status)) throw new ApiError(400, "Parameter tidak valid", { status: "Status transaksi tidak valid" });
-  const where: Prisma.TransactionWhereInput = {
+  const where = {
     outlet: { userId: ownerId(user) },
     ...(user.role === "kasir" ? { userId: user.userId } : {}),
     ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
@@ -699,7 +698,7 @@ export async function createTransaction(user: SessionUser, input: { customerId?:
 
     await createAudit(tx, user.userId, "transactions", `Membuat transaksi ${transaction.transactionId}`, "transaction", String(transaction.transactionId));
     return transaction;
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, { isolationLevel: "Serializable" });
 
   return transactionDto(row);
 }
@@ -796,7 +795,7 @@ export async function listPaymentsWithFilters(user: SessionUser, filters: URLSea
     const subscription = await prisma.subscription.findFirst({ where: { subscriptionId: numericId(subscriptionId, "subscriptionId"), userId: ownerId(user) } });
     if (!subscription) throw new ApiError(404, "Subscription tidak ditemukan");
   }
-  const where: Prisma.PaymentWhereInput = {
+  const where = {
     subscription: { userId: ownerId(user) },
     ...(subscriptionId ? { subscriptionId: numericId(subscriptionId, "subscriptionId") } : {}),
     ...(status ? { status: status as PaymentStatus } : {}),
@@ -883,11 +882,11 @@ export async function listNotifications(user: SessionUser, filters = new URLSear
   const sortOrder = parseSortOrder(filters);
   if (tipe && !["activation", "low_stock", "renewal", "system"].includes(tipe)) throw new ApiError(400, "Parameter tidak valid", { tipe: "Tipe notifikasi tidak valid" });
   if (status && !["pending", "sent", "failed"].includes(status)) throw new ApiError(400, "Parameter tidak valid", { status: "Status notifikasi tidak valid" });
-  const where: Prisma.NotificationLogWhereInput = {
+  const where = {
     userId: ownerId(user),
     ...(tipe ? { tipe: tipe as NotificationType } : {}),
     ...(status ? { status: status as NotificationStatus } : {}),
-    ...(search ? { pesan: { contains: search, mode: "insensitive" } } : {}),
+    ...(search ? { pesan: { contains: search, mode: "insensitive" as const } } : {}),
     ...(dateRange ? { createdAt: dateRange } : {}),
   };
   const [rows, total] = await Promise.all([
@@ -915,11 +914,11 @@ export async function listAuditLogs(user: SessionUser, filters: URLSearchParams)
   const dateRange = parseDateRange(filters);
   const pagination = parsePagination(filters);
   const sortOrder = parseSortOrder(filters);
-  const where: Prisma.AuditLogWhereInput = {
+  const where = {
     user: { OR: [{ userId: ownerId(user) }, { ownerUserId: ownerId(user) }] },
     ...(moduleName ? { module: moduleName } : {}),
     ...(entityType ? { entityType } : {}),
-    ...(search ? { OR: [{ aksi: { contains: search, mode: "insensitive" } }, { module: { contains: search, mode: "insensitive" } }] } : {}),
+    ...(search ? { OR: [{ aksi: { contains: search, mode: "insensitive" as const } }, { module: { contains: search, mode: "insensitive" as const } }] } : {}),
     ...(dateRange ? { createdAt: dateRange } : {}),
   };
   const [rows, total] = await Promise.all([
@@ -993,9 +992,9 @@ export async function analyticsOutletPerformance(user: SessionUser, filters: URL
   const dateRange = parseDateRange(filters);
   if (outletId) await ensureOutletAccess(numericId(outletId, "outletId"), user);
 
-  const where: Prisma.TransactionWhereInput = {
+  const where = {
     outlet: { userId: ownerId(user) },
-    status: "Sukses",
+    status: "Sukses" as const,
     ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
     ...(dateRange ? { tanggal: dateRange } : {}),
   };
