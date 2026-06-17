@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request);
     canReadNotifications(user);
-    return ok("Notification log berhasil diambil", await listNotifications(user));
+    return ok("Notification log berhasil diambil", await listNotifications(user, request.nextUrl.searchParams));
   } catch (error) {
     return handleApiError(error);
   }

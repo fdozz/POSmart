@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import type { ApiResponse } from "@/types/posmart";
 
@@ -36,6 +37,19 @@ export function handleApiError(error: unknown) {
       errors[key] = issue.message;
     }
     return fail("Validasi gagal", 400, errors);
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") {
+      const target = Array.isArray(error.meta?.target) ? error.meta.target.join(", ") : "data";
+      return fail("Data duplikat", 409, { [target]: "Data dengan nilai tersebut sudah ada" });
+    }
+    if (error.code === "P2003") {
+      return fail("Relasi data tidak valid", 400);
+    }
+    if (error.code === "P2025") {
+      return fail("Data tidak ditemukan", 404);
+    }
   }
 
   console.error(error);

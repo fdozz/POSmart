@@ -18,7 +18,7 @@ import {
   transactionDto,
   userDto,
 } from "@/server/dto/posmart";
-import type { AnalyticsSummary, PaymentStatus, SubscriptionPackage } from "@/types/posmart";
+import type { AnalyticsSummary, NotificationStatus, NotificationType, PaymentStatus, SubscriptionPackage } from "@/types/posmart";
 
 type PrismaTx = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -32,6 +32,93 @@ function numericId(value: string | undefined, field = "id") {
 
 function ownerId(user: SessionUser) {
   return user.ownerUserId;
+}
+
+type PaginationOptions = {
+  enabled: boolean;
+  page: number;
+  limit: number;
+  skip: number;
+  take: number;
+};
+
+type PaginatedResult<T> = {
+  items: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+function optionalSearch(filters: URLSearchParams) {
+  const search = filters.get("search")?.trim();
+  return search || undefined;
+}
+
+function parsePositiveIntParam(value: string | null, field: string, fallback: number) {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new ApiError(400, "Parameter tidak valid", { [field]: "Harus berupa angka positif" });
+  }
+  return parsed;
+}
+
+function parsePagination(filters: URLSearchParams): PaginationOptions {
+  const enabled = filters.has("page") || filters.has("limit");
+  const page = parsePositiveIntParam(filters.get("page"), "page", 1);
+  const limit = Math.min(parsePositiveIntParam(filters.get("limit"), "limit", 20), 100);
+  return { enabled, page, limit, skip: (page - 1) * limit, take: limit };
+}
+
+function maybePaginated<T>(items: T[], total: number, pagination: PaginationOptions): T[] | PaginatedResult<T> {
+  if (!pagination.enabled) return items;
+  return {
+    items,
+    pagination: {
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: Math.ceil(total / pagination.limit),
+    },
+  };
+}
+
+function parseSortOrder(filters: URLSearchParams): Prisma.SortOrder {
+  const sortOrder = filters.get("sortOrder") ?? filters.get("sort_order") ?? "desc";
+  if (sortOrder !== "asc" && sortOrder !== "desc") {
+    throw new ApiError(400, "Parameter tidak valid", { sortOrder: "Gunakan asc atau desc" });
+  }
+  return sortOrder;
+}
+
+function parseSortBy<T extends string>(filters: URLSearchParams, allowed: readonly T[], fallback: T): T {
+  const sortBy = filters.get("sortBy") ?? filters.get("sort_by") ?? fallback;
+  if (!allowed.includes(sortBy as T)) {
+    throw new ApiError(400, "Parameter tidak valid", { sortBy: `Gunakan salah satu: ${allowed.join(", ")}` });
+  }
+  return sortBy as T;
+}
+
+function parseDateParam(value: string | null, field: string, endOfDay = false) {
+  if (!value) return undefined;
+  const normalized = endOfDay && /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T23:59:59.999Z` : value;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ApiError(400, "Parameter tanggal tidak valid", { [field]: "Gunakan format tanggal yang valid" });
+  }
+  return parsed;
+}
+
+function parseDateRange(filters: URLSearchParams) {
+  const startDate = parseDateParam(filters.get("startDate") ?? filters.get("start_date"), "startDate");
+  const endDate = parseDateParam(filters.get("endDate") ?? filters.get("end_date"), "endDate", true);
+  if (startDate && endDate && startDate > endDate) {
+    throw new ApiError(400, "Parameter tanggal tidak valid", { startDate: "startDate tidak boleh setelah endDate" });
+  }
+  return startDate || endDate ? { ...(startDate ? { gte: startDate } : {}), ...(endDate ? { lte: endDate } : {}) } : undefined;
 }
 
 async function ensureOutletAccess(outletId: number, user: SessionUser, db: PrismaTx = prisma) {
@@ -145,9 +232,24 @@ export async function updateProfile(user: SessionUser, input: { nama?: string; e
   return userDto(updated);
 }
 
-export async function listOutlets(user: SessionUser) {
-  const outlets = await prisma.outlet.findMany({ where: { userId: ownerId(user) }, orderBy: { createdAt: "desc" } });
-  return outlets.map(outletDto);
+export async function listOutlets(user: SessionUser, filters = new URLSearchParams()) {
+  const pagination = parsePagination(filters);
+  const search = optionalSearch(filters);
+  const sortBy = parseSortBy(filters, ["createdAt", "nama"] as const, "createdAt");
+  const sortOrder = parseSortOrder(filters);
+  const where: Prisma.OutletWhereInput = {
+    userId: ownerId(user),
+    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" } }, { alamat: { contains: search, mode: "insensitive" } }] } : {}),
+  };
+  const [outlets, total] = await Promise.all([
+    prisma.outlet.findMany({
+      where,
+      orderBy: { [sortBy]: sortOrder },
+      ...(pagination.enabled ? { skip: pagination.skip, take: pagination.take } : {}),
+    }),
+    prisma.outlet.count({ where }),
+  ]);
+  return maybePaginated(outlets.map(outletDto), total, pagination);
 }
 
 export async function getOutlet(user: SessionUser, id: number) {
@@ -176,9 +278,23 @@ export async function deleteOutlet(user: SessionUser, id: number) {
   return { outletId: String(id) };
 }
 
-export async function listCategories(user: SessionUser) {
-  const rows = await prisma.category.findMany({ where: { ownerUserId: ownerId(user) }, orderBy: { nama: "asc" } });
-  return rows.map(categoryDto);
+export async function listCategories(user: SessionUser, filters = new URLSearchParams()) {
+  const pagination = parsePagination(filters);
+  const search = optionalSearch(filters);
+  const sortOrder = parseSortOrder(filters);
+  const where: Prisma.CategoryWhereInput = {
+    ownerUserId: ownerId(user),
+    ...(search ? { nama: { contains: search, mode: "insensitive" } } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    prisma.category.findMany({
+      where,
+      orderBy: { nama: sortOrder },
+      ...(pagination.enabled ? { skip: pagination.skip, take: pagination.take } : {}),
+    }),
+    prisma.category.count({ where }),
+  ]);
+  return maybePaginated(rows.map(categoryDto), total, pagination);
 }
 
 export async function getCategory(user: SessionUser, id: number) {
@@ -211,9 +327,23 @@ export async function deleteCategory(user: SessionUser, id: number) {
   return { categoryId: String(id) };
 }
 
-export async function listSuppliers(user: SessionUser) {
-  const rows = await prisma.supplier.findMany({ where: { ownerUserId: ownerId(user) }, orderBy: { nama: "asc" } });
-  return rows.map(supplierDto);
+export async function listSuppliers(user: SessionUser, filters = new URLSearchParams()) {
+  const pagination = parsePagination(filters);
+  const search = optionalSearch(filters);
+  const sortOrder = parseSortOrder(filters);
+  const where: Prisma.SupplierWhereInput = {
+    ownerUserId: ownerId(user),
+    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" } }, { kontak: { contains: search, mode: "insensitive" } }] } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    prisma.supplier.findMany({
+      where,
+      orderBy: { nama: sortOrder },
+      ...(pagination.enabled ? { skip: pagination.skip, take: pagination.take } : {}),
+    }),
+    prisma.supplier.count({ where }),
+  ]);
+  return maybePaginated(rows.map(supplierDto), total, pagination);
 }
 
 export async function getSupplier(user: SessionUser, id: number) {
@@ -249,19 +379,27 @@ export async function deleteSupplier(user: SessionUser, id: number) {
 export async function listProducts(user: SessionUser, filters: URLSearchParams) {
   const outletId = filters.get("outletId") ?? filters.get("outlet_id") ?? undefined;
   const categoryId = filters.get("categoryId") ?? filters.get("category_id") ?? undefined;
-  const search = filters.get("search") ?? undefined;
+  const search = optionalSearch(filters);
+  const pagination = parsePagination(filters);
+  const sortBy = parseSortBy(filters, ["createdAt", "nama", "harga", "sku"] as const, "createdAt");
+  const sortOrder = parseSortOrder(filters);
 
   if (outletId) await ensureOutletAccess(numericId(outletId, "outletId"), user);
-  const rows = await prisma.product.findMany({
-    where: {
-      outlet: { userId: ownerId(user) },
-      ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
-      ...(categoryId ? { categoryId: numericId(categoryId, "categoryId") } : {}),
-      ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" } }, { sku: { contains: search, mode: "insensitive" } }] } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-  });
-  return rows.map(productDto);
+  const where: Prisma.ProductWhereInput = {
+    outlet: { userId: ownerId(user) },
+    ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
+    ...(categoryId ? { categoryId: numericId(categoryId, "categoryId") } : {}),
+    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" } }, { sku: { contains: search, mode: "insensitive" } }] } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: { [sortBy]: sortOrder },
+      ...(pagination.enabled ? { skip: pagination.skip, take: pagination.take } : {}),
+    }),
+    prisma.product.count({ where }),
+  ]);
+  return maybePaginated(rows.map(productDto), total, pagination);
 }
 
 export async function getProduct(user: SessionUser, id: number) {
@@ -304,16 +442,31 @@ export async function deleteProduct(user: SessionUser, id: number) {
 export async function listInventory(user: SessionUser, filters: URLSearchParams) {
   const outletId = filters.get("outletId") ?? filters.get("outlet_id") ?? undefined;
   const productId = filters.get("productId") ?? filters.get("product_id") ?? undefined;
+  const status = filters.get("status") ?? undefined;
+  const search = optionalSearch(filters);
+  const pagination = parsePagination(filters);
+  const sortBy = parseSortBy(filters, ["updatedAt", "stok", "minStock"] as const, "updatedAt");
+  const sortOrder = parseSortOrder(filters);
+  if (status && status !== "low_stock") throw new ApiError(400, "Parameter tidak valid", { status: "Gunakan low_stock jika ingin memfilter stok menipis" });
   if (outletId) await ensureOutletAccess(numericId(outletId, "outletId"), user);
-  const rows = await prisma.inventory.findMany({
-    where: {
-      outlet: { userId: ownerId(user) },
-      ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
-      ...(productId ? { productId: numericId(productId, "productId") } : {}),
-    },
-    orderBy: { updatedAt: "desc" },
-  });
-  return rows.map(inventoryDto);
+  const where: Prisma.InventoryWhereInput = {
+    outlet: { userId: ownerId(user) },
+    ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
+    ...(productId ? { productId: numericId(productId, "productId") } : {}),
+    ...(search ? { product: { nama: { contains: search, mode: "insensitive" } } } : {}),
+  };
+  const [rows, totalRows] = await Promise.all([
+    prisma.inventory.findMany({
+      where,
+      orderBy: { [sortBy]: sortOrder },
+      ...(status === "low_stock" || !pagination.enabled ? {} : { skip: pagination.skip, take: pagination.take }),
+    }),
+    prisma.inventory.count({ where }),
+  ]);
+  const filteredRows = status === "low_stock" ? rows.filter((row) => row.stok <= row.minStock) : rows;
+  const total = status === "low_stock" ? filteredRows.length : totalRows;
+  const pageRows = status === "low_stock" && pagination.enabled ? filteredRows.slice(pagination.skip, pagination.skip + pagination.take) : filteredRows;
+  return maybePaginated(pageRows.map(inventoryDto), total, pagination);
 }
 
 export async function createInventory(user: SessionUser, input: { productId: string; outletId: string; stok: number; minStock?: number }) {
@@ -364,9 +517,24 @@ export async function lowStockInventory(user: SessionUser) {
   return rows.filter((row) => row.stok <= row.minStock).map(inventoryDto);
 }
 
-export async function listCustomers(user: SessionUser) {
-  const rows = await prisma.customer.findMany({ where: { ownerUserId: ownerId(user) }, orderBy: { nama: "asc" } });
-  return rows.map(customerDto);
+export async function listCustomers(user: SessionUser, filters = new URLSearchParams()) {
+  const pagination = parsePagination(filters);
+  const search = optionalSearch(filters);
+  const sortBy = parseSortBy(filters, ["nama"] as const, "nama");
+  const sortOrder = parseSortOrder(filters);
+  const where: Prisma.CustomerWhereInput = {
+    ownerUserId: ownerId(user),
+    ...(search ? { OR: [{ nama: { contains: search, mode: "insensitive" } }, { email: { contains: search, mode: "insensitive" } }, { telepon: { contains: search, mode: "insensitive" } }] } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    prisma.customer.findMany({
+      where,
+      orderBy: { [sortBy]: sortOrder },
+      ...(pagination.enabled ? { skip: pagination.skip, take: pagination.take } : {}),
+    }),
+    prisma.customer.count({ where }),
+  ]);
+  return maybePaginated(rows.map(customerDto), total, pagination);
 }
 
 export async function getCustomer(user: SessionUser, id: number) {
@@ -402,17 +570,33 @@ export async function deleteCustomer(user: SessionUser, id: number) {
 export async function listTransactions(user: SessionUser, filters: URLSearchParams) {
   const outletId = filters.get("outletId") ?? filters.get("outlet_id") ?? undefined;
   const customerId = filters.get("customerId") ?? filters.get("customer_id") ?? undefined;
+  const metode = filters.get("metode") ?? undefined;
+  const status = filters.get("status") ?? undefined;
+  const dateRange = parseDateRange(filters);
+  const pagination = parsePagination(filters);
+  const sortBy = parseSortBy(filters, ["tanggal", "total"] as const, "tanggal");
+  const sortOrder = parseSortOrder(filters);
   if (outletId) await ensureOutletAccess(numericId(outletId, "outletId"), user);
-  const rows = await prisma.transaction.findMany({
-    where: {
-      outlet: { userId: ownerId(user) },
-      ...(user.role === "kasir" ? { userId: user.userId } : {}),
-      ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
-      ...(customerId ? { customerId: numericId(customerId, "customerId") } : {}),
-    },
-    orderBy: { tanggal: "desc" },
-  });
-  return rows.map(transactionDto);
+  if (metode && !["Tunai", "Transfer", "QRIS", "Kartu"].includes(metode)) throw new ApiError(400, "Parameter tidak valid", { metode: "Metode pembayaran tidak valid" });
+  if (status && !["Sukses", "Pending", "Batal"].includes(status)) throw new ApiError(400, "Parameter tidak valid", { status: "Status transaksi tidak valid" });
+  const where: Prisma.TransactionWhereInput = {
+    outlet: { userId: ownerId(user) },
+    ...(user.role === "kasir" ? { userId: user.userId } : {}),
+    ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
+    ...(customerId ? { customerId: numericId(customerId, "customerId") } : {}),
+    ...(metode ? { metode: metode as "Tunai" | "Transfer" | "QRIS" | "Kartu" } : {}),
+    ...(status ? { status: status as "Sukses" | "Pending" | "Batal" } : {}),
+    ...(dateRange ? { tanggal: dateRange } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    prisma.transaction.findMany({
+      where,
+      orderBy: { [sortBy]: sortOrder },
+      ...(pagination.enabled ? { skip: pagination.skip, take: pagination.take } : {}),
+    }),
+    prisma.transaction.count({ where }),
+  ]);
+  return maybePaginated(rows.map(transactionDto), total, pagination);
 }
 
 export async function getTransaction(user: SessionUser, id: number) {
@@ -422,10 +606,17 @@ export async function getTransaction(user: SessionUser, id: number) {
       outlet: { userId: ownerId(user) },
       ...(user.role === "kasir" ? { userId: user.userId } : {}),
     },
-    include: { details: true },
+    include: { details: { include: { product: true } } },
   });
   if (!row) throw new ApiError(404, "Transaksi tidak ditemukan");
-  return { transaction: transactionDto(row), details: row.details.map(transactionDetailDto) };
+  return {
+    transaction: transactionDto(row),
+    details: row.details.map((detail) => ({
+      ...transactionDetailDto(detail),
+      unitPrice: Number(detail.unitPrice),
+      product: productDto(detail.product),
+    })),
+  };
 }
 
 export async function createTransaction(user: SessionUser, input: { customerId?: string; outletId: string; metode: "Tunai" | "Transfer" | "QRIS" | "Kartu"; status?: "Sukses" | "Pending" | "Batal"; items: Array<{ productId: string; quantity: number }> }) {
@@ -521,6 +712,12 @@ export async function subscriptionPlans() {
   ];
 }
 
+function subscriptionPrice(paket: SubscriptionPackage) {
+  if (paket === "Basic") return 299000;
+  if (paket === "Pro") return 599000;
+  return 0;
+}
+
 export async function currentSubscription(user: SessionUser) {
   const row = await prisma.subscription.findFirst({ where: { userId: ownerId(user) }, orderBy: { subscriptionId: "desc" } });
   if (!row) throw new ApiError(404, "Subscription tidak ditemukan");
@@ -536,44 +733,122 @@ export async function createSubscription(user: SessionUser, input: { paket: Subs
   const now = new Date();
   const endDate = new Date(now);
   endDate.setMonth(endDate.getMonth() + 1);
-  const row = await prisma.subscription.create({
-    data: {
-      userId: ownerId(user),
-      paket: input.paket,
-      status: input.paket === "Free" ? "active" : "pending",
-      startDate: now,
-      endDate,
-    },
+  const row = await prisma.$transaction(async (tx) => {
+    const subscription = await tx.subscription.create({
+      data: {
+        userId: ownerId(user),
+        paket: input.paket,
+        status: input.paket === "Free" ? "active" : "pending",
+        startDate: now,
+        endDate,
+      },
+    });
+
+    if (input.paket === "Free") {
+      await tx.notificationLog.create({
+        data: {
+          userId: ownerId(user),
+          tipe: "activation",
+          status: "sent",
+          pesan: "Subscription Free aktif.",
+        },
+      });
+    } else {
+      const amount = subscriptionPrice(input.paket);
+      await tx.payment.create({
+        data: {
+          subscriptionId: subscription.subscriptionId,
+          jumlah: amount,
+          metode: "mock",
+          status: "pending",
+          provider: "mock",
+        },
+      });
+      await tx.notificationLog.create({
+        data: {
+          userId: ownerId(user),
+          tipe: "system",
+          status: "pending",
+          pesan: `Pembayaran paket ${input.paket} sebesar ${amount} menunggu simulasi pembayaran.`,
+        },
+      });
+    }
+
+    await createAudit(tx, user.userId, "subscriptions", `Memilih paket ${input.paket}`, "subscription", String(subscription.subscriptionId));
+    return subscription;
   });
-  await createAudit(prisma, user.userId, "subscriptions", `Memilih paket ${input.paket}`, "subscription", String(row.subscriptionId));
   return subscriptionDto(row);
 }
 
 export async function listPayments(user: SessionUser, subscriptionId?: string) {
+  return listPaymentsWithFilters(user, new URLSearchParams(subscriptionId ? { subscriptionId } : undefined));
+}
+
+export async function listPaymentsWithFilters(user: SessionUser, filters: URLSearchParams) {
+  const subscriptionId = filters.get("subscriptionId") ?? filters.get("subscription_id") ?? undefined;
+  const status = filters.get("status") ?? undefined;
+  const dateRange = parseDateRange(filters);
+  const pagination = parsePagination(filters);
+  const sortBy = parseSortBy(filters, ["paymentDate", "jumlah", "status"] as const, "paymentDate");
+  const sortOrder = parseSortOrder(filters);
+  if (status && !["pending", "success", "failed", "expired"].includes(status)) throw new ApiError(400, "Parameter tidak valid", { status: "Status payment tidak valid" });
+  if (subscriptionId) {
+    const subscription = await prisma.subscription.findFirst({ where: { subscriptionId: numericId(subscriptionId, "subscriptionId"), userId: ownerId(user) } });
+    if (!subscription) throw new ApiError(404, "Subscription tidak ditemukan");
+  }
+  const where: Prisma.PaymentWhereInput = {
+    subscription: { userId: ownerId(user) },
+    ...(subscriptionId ? { subscriptionId: numericId(subscriptionId, "subscriptionId") } : {}),
+    ...(status ? { status: status as PaymentStatus } : {}),
+    ...(dateRange ? { paymentDate: dateRange } : {}),
+  };
   const rows = await prisma.payment.findMany({
-    where: {
-      subscription: { userId: ownerId(user) },
-      ...(subscriptionId ? { subscriptionId: numericId(subscriptionId, "subscriptionId") } : {}),
-    },
-    orderBy: { paymentDate: "desc" },
+    where,
+    orderBy: { [sortBy]: sortOrder },
+    ...(pagination.enabled ? { skip: pagination.skip, take: pagination.take } : {}),
   });
-  return rows.map(paymentDto);
+  const total = await prisma.payment.count({ where });
+  return maybePaginated(rows.map(paymentDto), total, pagination);
 }
 
 export async function createPayment(user: SessionUser, input: { subscriptionId: string; jumlah: number; metode?: string; status?: PaymentStatus }) {
   const subscriptionId = numericId(input.subscriptionId, "subscriptionId");
-  const subscription = await prisma.subscription.findFirst({ where: { subscriptionId, userId: ownerId(user) } });
-  if (!subscription) throw new ApiError(404, "Subscription tidak ditemukan");
-  const row = await prisma.payment.create({
-    data: {
-      subscriptionId,
-      jumlah: input.jumlah,
-      metode: input.metode,
-      status: input.status ?? "pending",
-      provider: "mock",
-    },
+  const status = input.status ?? "pending";
+  const row = await prisma.$transaction(async (tx) => {
+    const subscription = await tx.subscription.findFirst({ where: { subscriptionId, userId: ownerId(user) } });
+    if (!subscription) throw new ApiError(404, "Subscription tidak ditemukan");
+    const payment = await tx.payment.create({
+      data: {
+        subscriptionId,
+        jumlah: input.jumlah,
+        metode: input.metode,
+        status,
+        provider: "mock",
+      },
+    });
+    if (status === "success") {
+      await tx.subscription.update({ where: { subscriptionId }, data: { status: "active" } });
+      await tx.notificationLog.create({
+        data: {
+          userId: ownerId(user),
+          tipe: "activation",
+          status: "sent",
+          pesan: `Subscription ${subscription.paket} berhasil diaktifkan.`,
+        },
+      });
+    } else if (status === "pending") {
+      await tx.notificationLog.create({
+        data: {
+          userId: ownerId(user),
+          tipe: "system",
+          status: "pending",
+          pesan: `Pembayaran subscription ${subscription.paket} menunggu simulasi pembayaran.`,
+        },
+      });
+    }
+    await createAudit(tx, user.userId, "payments", `Membuat payment ${payment.paymentId}`, "payment", String(payment.paymentId));
+    return payment;
   });
-  await createAudit(prisma, user.userId, "payments", `Membuat payment ${row.paymentId}`, "payment", String(row.paymentId));
   return paymentDto(row);
 }
 
@@ -599,9 +874,31 @@ export async function updatePaymentStatus(user: SessionUser, paymentId: number, 
   return paymentDto(row);
 }
 
-export async function listNotifications(user: SessionUser) {
-  const rows = await prisma.notificationLog.findMany({ where: { userId: ownerId(user) }, orderBy: { createdAt: "desc" } });
-  return rows.map(notificationDto);
+export async function listNotifications(user: SessionUser, filters = new URLSearchParams()) {
+  const tipe = filters.get("tipe") ?? filters.get("type") ?? undefined;
+  const status = filters.get("status") ?? undefined;
+  const search = optionalSearch(filters);
+  const dateRange = parseDateRange(filters);
+  const pagination = parsePagination(filters);
+  const sortOrder = parseSortOrder(filters);
+  if (tipe && !["activation", "low_stock", "renewal", "system"].includes(tipe)) throw new ApiError(400, "Parameter tidak valid", { tipe: "Tipe notifikasi tidak valid" });
+  if (status && !["pending", "sent", "failed"].includes(status)) throw new ApiError(400, "Parameter tidak valid", { status: "Status notifikasi tidak valid" });
+  const where: Prisma.NotificationLogWhereInput = {
+    userId: ownerId(user),
+    ...(tipe ? { tipe: tipe as NotificationType } : {}),
+    ...(status ? { status: status as NotificationStatus } : {}),
+    ...(search ? { pesan: { contains: search, mode: "insensitive" } } : {}),
+    ...(dateRange ? { createdAt: dateRange } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    prisma.notificationLog.findMany({
+      where,
+      orderBy: { createdAt: sortOrder },
+      ...(pagination.enabled ? { skip: pagination.skip, take: pagination.take } : {}),
+    }),
+    prisma.notificationLog.count({ where }),
+  ]);
+  return maybePaginated(rows.map(notificationDto), total, pagination);
 }
 
 export async function createNotification(user: SessionUser, input: { userId?: string; pesan: string; tipe?: "activation" | "low_stock" | "renewal" | "system"; status?: "pending" | "sent" | "failed" }) {
@@ -613,14 +910,27 @@ export async function createNotification(user: SessionUser, input: { userId?: st
 
 export async function listAuditLogs(user: SessionUser, filters: URLSearchParams) {
   const moduleName = filters.get("module") ?? undefined;
-  const rows = await prisma.auditLog.findMany({
-    where: {
-      user: { OR: [{ userId: ownerId(user) }, { ownerUserId: ownerId(user) }] },
-      ...(moduleName ? { module: moduleName } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-  });
-  return rows.map(auditLogDto);
+  const entityType = filters.get("entityType") ?? filters.get("entity_type") ?? undefined;
+  const search = optionalSearch(filters);
+  const dateRange = parseDateRange(filters);
+  const pagination = parsePagination(filters);
+  const sortOrder = parseSortOrder(filters);
+  const where: Prisma.AuditLogWhereInput = {
+    user: { OR: [{ userId: ownerId(user) }, { ownerUserId: ownerId(user) }] },
+    ...(moduleName ? { module: moduleName } : {}),
+    ...(entityType ? { entityType } : {}),
+    ...(search ? { OR: [{ aksi: { contains: search, mode: "insensitive" } }, { module: { contains: search, mode: "insensitive" } }] } : {}),
+    ...(dateRange ? { createdAt: dateRange } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: sortOrder },
+      ...(pagination.enabled ? { skip: pagination.skip, take: pagination.take } : {}),
+    }),
+    prisma.auditLog.count({ where }),
+  ]);
+  return maybePaginated(rows.map(auditLogDto), total, pagination);
 }
 
 export async function getAuditLog(user: SessionUser, id: number) {
@@ -638,8 +948,7 @@ export async function createAuditLog(user: SessionUser, input: { userId?: string
 
 export async function analyticsSummary(user: SessionUser, filters: URLSearchParams): Promise<AnalyticsSummary & { lowStockSummary: unknown[]; recentTransactions: unknown[] }> {
   const outletId = filters.get("outletId") ?? filters.get("outlet_id") ?? undefined;
-  const startDate = filters.get("startDate") ?? filters.get("start_date") ?? undefined;
-  const endDate = filters.get("endDate") ?? filters.get("end_date") ?? undefined;
+  const dateRange = parseDateRange(filters);
   if (outletId) await ensureOutletAccess(numericId(outletId, "outletId"), user);
 
   const transactions = await prisma.transaction.findMany({
@@ -647,7 +956,7 @@ export async function analyticsSummary(user: SessionUser, filters: URLSearchPara
       outlet: { userId: ownerId(user) },
       status: "Sukses",
       ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
-      ...(startDate || endDate ? { tanggal: { ...(startDate ? { gte: new Date(startDate) } : {}), ...(endDate ? { lte: new Date(`${endDate}T23:59:59.999Z`) } : {}) } } : {}),
+      ...(dateRange ? { tanggal: dateRange } : {}),
     },
     include: { details: { include: { product: true } } },
     orderBy: { tanggal: "desc" },
@@ -677,4 +986,43 @@ export async function analyticsSummary(user: SessionUser, filters: URLSearchPara
     lowStockSummary: lowStockRows.filter((row) => row.stok <= row.minStock).map(inventoryDto),
     recentTransactions: recentRows.map(transactionDto),
   };
+}
+
+export async function analyticsOutletPerformance(user: SessionUser, filters: URLSearchParams) {
+  const outletId = filters.get("outletId") ?? filters.get("outlet_id") ?? undefined;
+  const dateRange = parseDateRange(filters);
+  if (outletId) await ensureOutletAccess(numericId(outletId, "outletId"), user);
+
+  const where: Prisma.TransactionWhereInput = {
+    outlet: { userId: ownerId(user) },
+    status: "Sukses",
+    ...(outletId ? { outletId: numericId(outletId, "outletId") } : {}),
+    ...(dateRange ? { tanggal: dateRange } : {}),
+  };
+
+  const grouped = await prisma.transaction.groupBy({
+    by: ["outletId"],
+    where,
+    _count: { transactionId: true },
+    _sum: { total: true },
+    orderBy: { outletId: "asc" },
+  });
+
+  const outlets = await prisma.outlet.findMany({
+    where: { userId: ownerId(user), outletId: { in: grouped.map((row) => row.outletId) } },
+  });
+  const outletMap = new Map(outlets.map((outlet) => [outlet.outletId, outlet]));
+
+  return grouped.map((row) => {
+    const totalRevenue = Number(row._sum.total ?? 0);
+    const transactionCount = row._count.transactionId;
+    const outlet = outletMap.get(row.outletId);
+    return {
+      outletId: String(row.outletId),
+      nama: outlet?.nama ?? `Outlet ${row.outletId}`,
+      totalRevenue,
+      transactionCount,
+      averageTransaction: transactionCount > 0 ? totalRevenue / transactionCount : 0,
+    };
+  });
 }
