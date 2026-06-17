@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 import { defineConfig, env } from 'prisma/config';
 
-dotenv.config({ path: '.env.local' });
+// Keep local overrides working while also loading the production `.env` file.
+// Values already supplied by the process environment retain highest priority.
+dotenv.config({ path: ['.env.local', '.env'] });
 
 export default defineConfig({
     schema: 'prisma/schema.prisma',
