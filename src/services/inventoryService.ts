@@ -1,9 +1,9 @@
 import type { Inventory } from "@/types/posmart";
-import { apiRequest, jsonBody, queryString } from "./api";
+import { apiListRequest, apiRequest, jsonBody, queryString } from "./api";
 
 export const inventoryService = {
-  list(filters?: { outletId?: string; productId?: string; userId?: string }) {
-    return apiRequest<Inventory[]>(`/api/inventory${queryString(filters)}`);
+  list(filters?: { outletId?: string; productId?: string; userId?: string; status?: "low_stock"; page?: number; limit?: number }) {
+    return apiListRequest<Inventory>(`/api/inventory${queryString(filters)}`);
   },
 
   create(input: { productId: string; outletId: string; stok: number; minStock?: number }) {
@@ -21,6 +21,6 @@ export const inventoryService = {
   },
 
   lowStock() {
-    return apiRequest<Inventory[]>("/api/inventory/low-stock");
+    return apiListRequest<Inventory>("/api/inventory/low-stock");
   },
 };

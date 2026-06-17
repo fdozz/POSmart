@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/AppState";
-import { auditLogService, outletService } from "@/services";
+import { outletService } from "@/services";
 import { useSession } from "@/contexts/SessionContext";
 import type { Outlet } from "@/types/posmart";
 import { CheckCircle2, Pencil, Plus, Store, Trash2, X } from "lucide-react";
@@ -18,7 +18,7 @@ const emptyForm: OutletForm = { nama: "", alamat: "" };
 
 export default function OutletsPage() {
   const { currentUser } = useSession();
-  const currentUserId = currentUser?.userId ?? "user-owner-001";
+  const currentUserId = currentUser?.userId;
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,7 +68,6 @@ export default function OutletsPage() {
     if (editing) {
       const response = await outletService.update(editing.outletId, form);
       if (response.success && response.data) {
-        await auditLogService.create({ userId: currentUserId, aksi: `Memperbarui outlet ${response.data.nama}`, module: "outlets" });
         setOutlets((prev) => prev.map((item) => item.outletId === editing.outletId ? response.data! : item));
         setSuccess("Outlet berhasil diperbarui.");
         setEditing(null);
@@ -81,7 +80,6 @@ export default function OutletsPage() {
 
     const response = await outletService.create({ userId: currentUserId, nama: form.nama, alamat: form.alamat });
     if (response.success && response.data) {
-      await auditLogService.create({ userId: currentUserId, aksi: `Membuat outlet ${response.data.nama}`, module: "outlets" });
       setOutlets((prev) => prev.some((item) => item.outletId === response.data!.outletId) ? [...prev] : [response.data!, ...prev]);
       setActiveOutletId((current) => current || response.data!.outletId);
       setSuccess("Outlet berhasil ditambahkan.");
@@ -91,15 +89,20 @@ export default function OutletsPage() {
     }
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) return;
+    const response = await outletService.remove(deleteTarget.outletId);
+    if (!response.success) {
+      setValidation(response.errors ?? { form: response.message });
+      setDeleteTarget(null);
+      return;
+    }
     setOutlets((prev) => prev.filter((item) => item.outletId !== deleteTarget.outletId));
-    void auditLogService.create({ userId: currentUserId, aksi: `Menghapus outlet ${deleteTarget.nama}`, module: "outlets" });
     if (activeOutletId === deleteTarget.outletId) {
       const nextOutlet = outlets.find((item) => item.outletId !== deleteTarget.outletId);
       setActiveOutletId(nextOutlet?.outletId ?? "");
     }
-    setSuccess("Outlet berhasil dihapus dari mock data.");
+    setSuccess("Outlet berhasil dihapus.");
     setDeleteTarget(null);
   }
 
@@ -202,7 +205,7 @@ export default function OutletsPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Hapus outlet?"
-        description={`Outlet ${deleteTarget?.nama ?? ""} akan dihapus dari tampilan mock. Data backend belum berubah.`}
+        description={`Outlet ${deleteTarget?.nama ?? ""} akan dihapus dari backend jika tidak memiliki transaksi terkait.`}
         confirmLabel="Hapus"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}

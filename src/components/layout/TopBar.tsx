@@ -41,7 +41,7 @@ const MENU_ITEMS = [
 
 export default function TopBar() {
   const router = useRouter();
-  const { currentUser, currentRole, switchRole, logoutMock } = useSession();
+  const { currentUser, currentRole, switchRole, logout } = useSession();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const role = currentRole ?? "owner";
@@ -135,7 +135,7 @@ export default function TopBar() {
               {/* Logout */}
               <div className="border-t border-gray-100 px-4 py-3">
                 <button
-                  onClick={() => { setOpen(false); logoutMock(); router.push("/login"); }}
+                  onClick={() => { setOpen(false); void logout().finally(() => router.push("/login")); }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-red-500 transition-colors hover:bg-red-50"
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-50">

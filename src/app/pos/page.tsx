@@ -130,13 +130,18 @@ export default function POSPage() {
         return;
       }
 
-      setOutlets(outletResponse.data);
-      setActiveOutletId(outletResponse.data[0]?.outletId ?? "");
-
       if (categoryResponse.success && categoryResponse.data) setCategories(categoryResponse.data);
       if (productResponse.success && productResponse.data) setProducts(productResponse.data);
       if (inventoryResponse.success && inventoryResponse.data) setInventory(inventoryResponse.data);
       if (customerResponse.success && customerResponse.data) setCustomers(customerResponse.data);
+      const nextProducts = productResponse.success && productResponse.data ? productResponse.data : [];
+      const nextInventory = inventoryResponse.success && inventoryResponse.data ? inventoryResponse.data : [];
+      const outletWithProducts = outletResponse.data.find((outlet) =>
+        nextProducts.some((product) => product.outletId === outlet.outletId) ||
+        nextInventory.some((item) => item.outletId === outlet.outletId),
+      );
+      setOutlets(outletResponse.data);
+      setActiveOutletId(outletWithProducts?.outletId ?? outletResponse.data[0]?.outletId ?? "");
       setLoading(false);
     }
 

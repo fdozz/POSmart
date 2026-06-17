@@ -1,5 +1,5 @@
 import type { NotificationLog } from "@/types/posmart";
-import { apiRequest, jsonBody } from "./api";
+import { apiListRequest, apiRequest, jsonBody, queryString } from "./api";
 
 type LowStockInput = {
   userId: string;
@@ -11,9 +11,9 @@ type LowStockInput = {
 };
 
 export const notificationService = {
-  list(filters?: string | { userId?: string; workspaceUserId?: string }) {
-    void filters;
-    return apiRequest<NotificationLog[]>("/api/notifications");
+  list(filters?: string | { userId?: string; workspaceUserId?: string; page?: number; limit?: number }) {
+    const query = typeof filters === "string" ? { userId: filters } : filters;
+    return apiListRequest<NotificationLog>(`/api/notifications${queryString(query)}`);
   },
 
   create(input: Omit<NotificationLog, "notifId" | "createdAt" | "status"> & { status?: NotificationLog["status"] }) {

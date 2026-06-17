@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStatus, toProductView, type ProductCategory, type Product as ProductView } from "@/data/products";
-import { auditLogService, categoryService, inventoryService, outletService, productService } from "@/services";
+import { categoryService, inventoryService, outletService, productService } from "@/services";
 import { useSession } from "@/contexts/SessionContext";
 import type { Category, Inventory, Outlet, Product } from "@/types/posmart";
 import { Search, Plus, Pencil, Trash2, Package, ChevronDown, X } from "lucide-react";
@@ -60,7 +60,7 @@ function formatPrice(p: number) {
 
 export default function ProductsPage() {
   const { currentUser } = useSession();
-  const currentUserId = currentUser?.userId ?? "user-owner-001";
+  const currentUserId = currentUser?.userId;
   const [search, setSearch]                 = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("Semua");
   const [statusFilter, setStatusFilter]     = useState<StatusFilter>("Semua");
@@ -101,8 +101,9 @@ export default function ProductsPage() {
     const menipis    = products.filter(p => getStatus(p.stock, p.minStock) === "Menipis").length;
     const habis      = products.filter(p => getStatus(p.stock, p.minStock) === "Habis").length;
     const categories = new Set(products.map(p => p.category)).size;
-    const totalSold  = products.reduce((s, p) => s + p.sold, 0);
-    return { aktif, menipis, habis, categories, totalSold };
+    const totalStock = products.reduce((s, p) => s + p.stock, 0);
+    const minimumStock = products.length > 0 ? Math.min(...products.map(p => p.minStock)) : 0;
+    return { aktif, menipis, habis, categories, totalStock, minimumStock };
   }, [products]);
 
   const filtered = useMemo(() => {
@@ -134,14 +135,8 @@ export default function ProductsPage() {
   }
 
   function handleDelete(id: string) {
-    const product = products.find(p => p.id === id);
     void productService.remove(id).then((response) => {
       if (response.success) setProducts(prev => prev.filter(p => p.id !== id));
-    });
-    void auditLogService.create({
-      userId: currentUserId,
-      aksi: `Menghapus produk ${product?.name ?? id}`,
-      module: "products",
     });
   }
 
@@ -173,11 +168,6 @@ export default function ProductsPage() {
           setProducts((current) => current.map((item) => item.id === editingId ? toProductView(response.data!, nextInventory, categories) : item));
         });
       });
-      void auditLogService.create({
-        userId: currentUserId,
-        aksi: `Memperbarui produk ${form.name || existingProduct?.name || editingId}`,
-        module: "products",
-      });
     } else {
       const selectedCategory = categories.find((category) => category.nama === form.category);
       const selectedOutlet = outlets[0];
@@ -200,10 +190,7 @@ export default function ProductsPage() {
         categoryId: selectedCategory?.categoryId,
         outletId: selectedOutlet?.outletId,
       }).then((response) => {
-        if (!response.success || !response.data) {
-          setProducts(prev => [newProduct, ...prev]);
-          return;
-        }
+        if (!response.success || !response.data) return;
         const inventoryCreate = selectedOutlet
           ? inventoryService.create({ productId: response.data!.productId, outletId: selectedOutlet.outletId, stok: stock })
           : Promise.resolve(null);
@@ -214,11 +201,6 @@ export default function ProductsPage() {
           setDomainProducts(nextDomainProducts);
           setProducts(nextDomainProducts.map((product) => toProductView(product, nextInventory, categories)));
         });
-      });
-      void auditLogService.create({
-        userId: currentUserId,
-        aksi: `Membuat produk ${newProduct.name}`,
-        module: "products",
       });
     }
     setShowForm(false);
@@ -301,35 +283,35 @@ export default function ProductsPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Min. Stok</span>
-              <span className="text-xs font-semibold text-gray-600">10 unit</span>
+              <span className="text-xs font-semibold text-gray-600">{stats.minimumStock} unit</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Bulan Ini</span>
-              <span className="text-xs font-semibold text-green-600">+234</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Status</span>
+              <span className="text-xs font-semibold text-gray-600">Data backend</span>
             </div>
           </div>
         </div>
 
         {/* Card 3 — Total Terjual */}
         <div className="rounded-[20px] bg-white p-5 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total Terjual</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total Stok Tercatat</p>
           <p className="mt-1 text-4xl font-extrabold text-gray-900">
-            {stats.totalSold.toLocaleString("id-ID")}
+            {stats.totalStock.toLocaleString("id-ID")}
           </p>
-          <p className="mt-3 text-xs text-gray-400">unit terjual keseluruhan</p>
+          <p className="mt-3 text-xs text-gray-400">unit dari inventory backend</p>
         </div>
 
         {/* Card 4 — Stok Keluar Hari Ini */}
         <div className="rounded-[20px] bg-white p-5 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Stok Keluar Hari Ini</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Stok Aman</p>
           <p className="mt-1 text-4xl font-extrabold text-gray-900">
-            4 <span className="text-xl font-bold">Unit</span>
+            {stats.aktif} <span className="text-xl font-bold">Produk</span>
           </p>
           <div className="mt-3 flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Tren</span>
-            <span className="rounded-lg bg-green-50 px-2 py-0.5 text-xs font-bold text-green-600">+2%</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Sumber</span>
+            <span className="rounded-lg bg-green-50 px-2 py-0.5 text-xs font-bold text-green-600">Live</span>
           </div>
-          <p className="mt-1 text-xs text-gray-400">dibanding kemarin</p>
+          <p className="mt-1 text-xs text-gray-400">berdasarkan stok minimum</p>
         </div>
       </div>
 

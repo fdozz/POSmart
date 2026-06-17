@@ -1,10 +1,9 @@
 import type { Category } from "@/types/posmart";
-import { apiRequest, jsonBody } from "./api";
+import { apiListRequest, apiRequest, jsonBody, queryString } from "./api";
 
 export const categoryService = {
-  list(filters?: { userId?: string }) {
-    void filters;
-    return apiRequest<Category[]>("/api/categories");
+  list(filters?: { userId?: string; page?: number; limit?: number; search?: string }) {
+    return apiListRequest<Category>(`/api/categories${queryString(filters)}`);
   },
 
   detail(categoryId: string) {

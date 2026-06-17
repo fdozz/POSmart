@@ -6,7 +6,7 @@ import {
   formatRpShort, toSupplierView,
   type Supplier, type SupplierStatus,
 } from "@/data/suppliers";
-import { auditLogService, productService, supplierService } from "@/services";
+import { productService, supplierService } from "@/services";
 import { useSession } from "@/contexts/SessionContext";
 import {
   Search, Plus, X, Mail, Phone, MapPin,
@@ -33,7 +33,7 @@ const emptyAdd: AddForm = {
 
 export default function SuppliersPage() {
   const { currentUser } = useSession();
-  const currentUserId = currentUser?.userId ?? "user-owner-001";
+  const currentUserId = currentUser?.userId;
   const [search, setSearch]         = useState("");
   const [statusFilter, setStatus]   = useState<StatusFilter>("Semua");
   const [detail, setDetail]         = useState<Supplier | null>(null);
@@ -92,14 +92,7 @@ export default function SuppliersPage() {
       if (response.success && response.data) {
         const createdSupplier = response.data;
         setSuppliers(prev => [toSupplierView(createdSupplier, prev.length, []), ...prev]);
-      } else {
-        setSuppliers(prev => [newSupplier, ...prev]);
       }
-    });
-    void auditLogService.create({
-      userId: currentUserId,
-      aksi: `Membuat supplier ${newSupplier.name}`,
-      module: "suppliers",
     });
     setAddForm(emptyAdd);
     setShowAdd(false);

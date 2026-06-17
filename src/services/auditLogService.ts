@@ -1,9 +1,9 @@
 import type { AuditLog } from "@/types/posmart";
-import { apiRequest, jsonBody, queryString } from "./api";
+import { apiListRequest, apiRequest, jsonBody, queryString } from "./api";
 
 export const auditLogService = {
-  list(filters?: { userId?: string; module?: string; workspaceUserId?: string }) {
-    return apiRequest<AuditLog[]>(`/api/audit-logs${queryString({ module: filters?.module })}`);
+  list(filters?: { userId?: string; module?: string; workspaceUserId?: string; page?: number; limit?: number }) {
+    return apiListRequest<AuditLog>(`/api/audit-logs${queryString({ module: filters?.module, page: filters?.page, limit: filters?.limit })}`);
   },
 
   create(input: Omit<AuditLog, "auditId" | "createdAt">) {

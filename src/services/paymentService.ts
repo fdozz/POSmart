@@ -1,9 +1,9 @@
 import type { Payment } from "@/types/posmart";
-import { apiRequest, jsonBody, queryString } from "./api";
+import { apiListRequest, apiRequest, jsonBody, queryString } from "./api";
 
 export const paymentService = {
-  list(subscriptionId?: string) {
-    return apiRequest<Payment[]>(`/api/payments${queryString({ subscriptionId })}`);
+  list(subscriptionId?: string, filters?: { page?: number; limit?: number }) {
+    return apiListRequest<Payment>(`/api/payments${queryString({ subscriptionId, ...filters })}`);
   },
 
   create(input: Pick<Payment, "subscriptionId" | "jumlah" | "metode"> & { status?: Payment["status"] }) {

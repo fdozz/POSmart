@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Eye, EyeOff } from "lucide-react";
-import { auditLogService, authService } from "@/services";
+import { authService } from "@/services";
 import { useSession } from "@/contexts/SessionContext";
 
 type RegisterForm = {
@@ -63,12 +63,6 @@ export default function RegisterPage() {
       setLoading(false);
       return;
     }
-
-    await auditLogService.create({
-      userId: response.data.userId,
-      aksi: "Registrasi akun owner baru",
-      module: "auth",
-    });
 
     setSessionUser(response.data);
     setSuccess("Registrasi berhasil. Mengarahkan ke pemilihan paket...");

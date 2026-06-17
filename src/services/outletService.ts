@@ -1,10 +1,9 @@
 import type { Outlet } from "@/types/posmart";
-import { apiRequest, jsonBody } from "./api";
+import { apiListRequest, apiRequest, jsonBody, queryString } from "./api";
 
 export const outletService = {
-  list(filters?: { userId?: string }) {
-    void filters;
-    return apiRequest<Outlet[]>("/api/outlets");
+  list(filters?: { userId?: string; page?: number; limit?: number }) {
+    return apiListRequest<Outlet>(`/api/outlets${queryString(filters)}`);
   },
 
   detail(outletId: string) {

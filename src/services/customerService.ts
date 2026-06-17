@@ -1,10 +1,9 @@
 import type { Customer } from "@/types/posmart";
-import { apiRequest, jsonBody } from "./api";
+import { apiListRequest, apiRequest, jsonBody, queryString } from "./api";
 
 export const customerService = {
-  list(filters?: { userId?: string }) {
-    void filters;
-    return apiRequest<Customer[]>("/api/customers");
+  list(filters?: { userId?: string; page?: number; limit?: number; search?: string }) {
+    return apiListRequest<Customer>(`/api/customers${queryString(filters)}`);
   },
 
   detail(customerId: string) {

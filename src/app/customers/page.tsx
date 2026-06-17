@@ -6,7 +6,7 @@ import {
   formatRpShort, avatarColor, calcTier, toCustomerView,
   type Customer, type CustomerTier,
 } from "@/data/customers";
-import { auditLogService, customerService, transactionService } from "@/services";
+import { customerService, transactionService } from "@/services";
 import { useSession } from "@/contexts/SessionContext";
 import {
   Search, UserPlus, X, Phone, Calendar,
@@ -29,7 +29,7 @@ const emptyAdd: AddForm = { name: "", email: "", phone: "", purchases: "", qty: 
 
 export default function CustomersPage() {
   const { currentUser } = useSession();
-  const currentUserId = currentUser?.userId ?? "user-owner-001";
+  const currentUserId = currentUser?.userId;
   const [search, setSearch]   = useState("");
   const [tierFilter, setTier] = useState<TierFilter>("Semua");
   const [detail, setDetail]   = useState<Customer | null>(null);
@@ -85,14 +85,7 @@ export default function CustomersPage() {
       if (response.success && response.data) {
         const createdCustomer = response.data;
         setCustomers(prev => [toCustomerView(createdCustomer, []), ...prev]);
-      } else {
-        setCustomers(prev => [newCustomer, ...prev]);
       }
-    });
-    void auditLogService.create({
-      userId: currentUserId,
-      aksi: `Membuat pelanggan ${newCustomer.name}`,
-      module: "customers",
     });
     setAddForm(emptyAdd);
     setShowAdd(false);

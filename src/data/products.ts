@@ -3,6 +3,7 @@ import type { Category, Inventory, Product as DomainProduct } from "@/types/posm
 
 export type ProductCategory = "Minuman" | "Makanan" | "Snack" | "Retail";
 export type ProductStatus = "Aktif" | "Menipis" | "Habis";
+export const PRODUCT_CATEGORIES: ProductCategory[] = ["Minuman", "Makanan", "Snack", "Retail"];
 
 export type Product = {
   id: string;
@@ -17,6 +18,10 @@ export type Product = {
 
 const categoryNameById = new Map(mockCategories.map((category) => [category.categoryId, category.nama as ProductCategory]));
 
+function normalizeCategory(value: string | undefined): ProductCategory {
+  return PRODUCT_CATEGORIES.includes(value as ProductCategory) ? value as ProductCategory : "Retail";
+}
+
 export function getStatus(stock: number, minStock: number): ProductStatus {
   if (stock === 0) return "Habis";
   if (stock <= minStock) return "Menipis";
@@ -26,11 +31,12 @@ export function getStatus(stock: number, minStock: number): ProductStatus {
 export function toProductView(product: DomainProduct, inventorySource: Inventory[] = mockInventory, categorySource: Category[] = mockCategories): Product {
   const categories = new Map(categorySource.map((category) => [category.categoryId, category.nama as ProductCategory]));
   const inventoryRows = inventorySource.filter((item) => item.productId === product.productId);
+  const category = normalizeCategory(categories.get(product.categoryId ?? "") ?? categoryNameById.get(product.categoryId ?? ""));
   return {
     id: product.productId,
     name: product.nama,
     sku: product.sku ?? product.productId,
-    category: categories.get(product.categoryId ?? "") ?? categoryNameById.get(product.categoryId ?? "") ?? "Retail",
+    category,
     stock: inventoryRows.reduce((sum, item) => sum + item.stok, 0),
     minStock: inventoryRows.length > 0 ? Math.min(...inventoryRows.map((item) => item.minStock)) : 5,
     price: product.harga,
@@ -47,5 +53,3 @@ export const mockProductsLegacy: Product[] = mockProducts.map((product) => {
 });
 
 export { mockProductsLegacy as mockProducts };
-
-export const PRODUCT_CATEGORIES: ProductCategory[] = ["Minuman", "Makanan", "Snack", "Retail"];

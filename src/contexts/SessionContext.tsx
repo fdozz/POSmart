@@ -9,6 +9,8 @@ type SessionContextValue = {
   currentRole: UserRole | null;
   loading: boolean;
   isAuthenticated: boolean;
+  loginAsDemoRole: (role?: UserRole) => void;
+  logout: () => Promise<void>;
   loginMock: (role?: UserRole) => void;
   logoutMock: () => void;
   setSessionUser: (user: User) => void;
@@ -43,31 +45,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   }, [refreshSession]);
 
-  const loginMock = useCallback((role: UserRole = "owner") => {
+  const loginAsDemoRole = useCallback((role: UserRole = "owner") => {
     void authService.login({ ...demoCredentials[role], role }).then((response) => {
       if (response.success && response.data) setCurrentUser(response.data);
     });
   }, []);
 
-  const logoutMock = useCallback(() => {
-    void authService.logout().finally(() => setCurrentUser(null));
+  const logout = useCallback(async () => {
+    await authService.logout().finally(() => setCurrentUser(null));
   }, []);
 
+  const loginMock = loginAsDemoRole;
+  const logoutMock = useCallback(() => {
+    void logout();
+  }, [logout]);
+
   const switchRole = useCallback((role: UserRole) => {
-    loginMock(role);
-  }, [loginMock]);
+    loginAsDemoRole(role);
+  }, [loginAsDemoRole]);
 
   const value = useMemo<SessionContextValue>(() => ({
     currentUser,
     currentRole: currentUser?.role ?? null,
     loading,
     isAuthenticated: Boolean(currentUser),
+    loginAsDemoRole,
+    logout,
     loginMock,
     logoutMock,
     setSessionUser: setCurrentUser,
     switchRole,
     refreshSession,
-  }), [currentUser, loading, loginMock, logoutMock, refreshSession, switchRole]);
+  }), [currentUser, loading, loginAsDemoRole, loginMock, logout, logoutMock, refreshSession, switchRole]);
 
   return (
     <SessionContext.Provider value={value}>

@@ -1,10 +1,9 @@
 import type { Supplier } from "@/types/posmart";
-import { apiRequest, jsonBody } from "./api";
+import { apiListRequest, apiRequest, jsonBody, queryString } from "./api";
 
 export const supplierService = {
-  list(filters?: { userId?: string }) {
-    void filters;
-    return apiRequest<Supplier[]>("/api/suppliers");
+  list(filters?: { userId?: string; page?: number; limit?: number; search?: string }) {
+    return apiListRequest<Supplier>(`/api/suppliers${queryString(filters)}`);
   },
 
   detail(supplierId: string) {

@@ -1,9 +1,9 @@
 import type { Product } from "@/types/posmart";
-import { apiRequest, jsonBody, queryString } from "./api";
+import { apiListRequest, apiRequest, jsonBody, queryString } from "./api";
 
 export const productService = {
-  list(filters?: { outletId?: string; categoryId?: string; search?: string; userId?: string }) {
-    return apiRequest<Product[]>(`/api/products${queryString(filters)}`);
+  list(filters?: { outletId?: string; categoryId?: string; search?: string; userId?: string; page?: number; limit?: number }) {
+    return apiListRequest<Product>(`/api/products${queryString(filters)}`);
   },
 
   detail(productId: string) {

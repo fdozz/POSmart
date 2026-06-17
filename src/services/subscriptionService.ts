@@ -1,9 +1,9 @@
 import type { Subscription, SubscriptionPackage } from "@/types/posmart";
-import { apiRequest, jsonBody } from "./api";
+import { apiListRequest, apiRequest, jsonBody } from "./api";
 
 export const subscriptionService = {
   list() {
-    return apiRequest<Subscription[]>("/api/subscriptions");
+    return apiListRequest<Subscription>("/api/subscriptions");
   },
 
   plans() {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/AppState";
-import { auditLogService, notificationService, paymentService, subscriptionService } from "@/services";
+import { subscriptionService } from "@/services";
 import { useSession } from "@/contexts/SessionContext";
 import type { Subscription, SubscriptionPackage } from "@/types/posmart";
 import { Check, CreditCard, Info, Star, Zap } from "lucide-react";
@@ -86,7 +86,7 @@ export default function SubscriptionPage() {
     };
   }, [currentUser]);
 
-  async function handleSelectPackage(paket: SubscriptionPackage, price: number) {
+  async function handleSelectPackage(paket: SubscriptionPackage) {
     if (!currentUser) {
       setError("Session tidak ditemukan. Silakan login atau registrasi ulang.");
       return;
@@ -103,41 +103,13 @@ export default function SubscriptionPage() {
       return;
     }
 
-    const paymentResponse = await paymentService.create({
-      subscriptionId: subscriptionResponse.data.subscriptionId,
-      jumlah: price,
-      metode: paket === "Free" ? "Free Package" : "Midtrans Mock",
-      status: paket === "Free" ? "success" : "pending",
-    });
-
-    if (!paymentResponse.success) {
-      setError(paymentResponse.message);
-      setSelecting(null);
-      return;
-    }
-
-    if (paket === "Free") {
-      await subscriptionService.activate(subscriptionResponse.data.subscriptionId);
-    }
-
-    await auditLogService.create({
-      userId: currentUser.userId,
-      aksi: `Memilih paket ${paket}`,
-      module: "subscriptions",
-    });
-
-    await notificationService.create({
-      userId: currentUser.userId,
-      tipe: paket === "Free" ? "activation" : "system",
-      pesan: paket === "Free"
-        ? "Paket Free aktif. Anda dapat melanjutkan onboarding POSmart."
-        : `Payment paket ${paket} masih pending dalam mode mock.`,
-      status: paket === "Free" ? "sent" : "pending",
-    });
-
     setCurrentSubscription(subscriptionResponse.data);
-    setSuccess("Paket dipilih dan payment record mock dibuat. Mengarahkan ke status pembayaran...");
-    setTimeout(() => router.push("/payments"), 700);
+    setSuccess(
+      paket === "Free"
+        ? "Paket Free aktif. Mengarahkan ke onboarding..."
+        : `Paket ${paket} dipilih dan payment pending dibuat backend. Mengarahkan ke status pembayaran...`,
+    );
+    setTimeout(() => router.push(paket === "Free" ? "/onboarding" : "/payments"), 700);
   }
 
   return (
@@ -178,7 +150,7 @@ export default function SubscriptionPage() {
       {loading ? (
         <LoadingState title="Memuat paket..." />
       ) : plans.length === 0 ? (
-        <EmptyState title="Belum ada paket" description="Data paket subscription belum tersedia di mock service." />
+        <EmptyState title="Belum ada paket" description="Data paket subscription belum tersedia dari backend." />
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           {plans.map((plan) => {
@@ -215,7 +187,7 @@ export default function SubscriptionPage() {
                 </div>
 
                 <button
-                  onClick={() => handleSelectPackage(plan.paket, plan.price)}
+                  onClick={() => handleSelectPackage(plan.paket)}
                   disabled={selecting !== null}
                   className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-colors ${
                     isCurrent

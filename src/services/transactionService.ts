@@ -1,13 +1,13 @@
 import type { Transaction, TransactionDetail } from "@/types/posmart";
-import { apiRequest, jsonBody, queryString } from "./api";
+import { apiListRequest, apiRequest, jsonBody, queryString } from "./api";
 
 export type CreateTransactionInput = Omit<Transaction, "transactionId" | "tanggal" | "total"> & {
   items: Array<Pick<TransactionDetail, "productId" | "quantity" | "subtotal">>;
 };
 
 export const transactionService = {
-  list(filters?: { outletId?: string; customerId?: string; userId?: string }) {
-    return apiRequest<Transaction[]>(`/api/transactions${queryString(filters)}`);
+  list(filters?: { outletId?: string; customerId?: string; userId?: string; page?: number; limit?: number }) {
+    return apiListRequest<Transaction>(`/api/transactions${queryString(filters)}`);
   },
 
   detail(transactionId: string) {

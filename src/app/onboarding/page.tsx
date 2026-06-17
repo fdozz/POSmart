@@ -40,7 +40,7 @@ type InventoryForm = { productId: string; outletId: string; stok: string };
 export default function OnboardingPage() {
   const router = useRouter();
   const { currentUser } = useSession();
-  const currentUserId = currentUser?.userId ?? "user-owner-001";
+  const currentUserId = currentUser?.userId;
   const [stepIndex, setStepIndex] = useState(0);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
