@@ -188,21 +188,6 @@ export default function LoginPage() {
           {/* Karyawan Form */}
           {activeTab === "karyawan" && (
             <div className="space-y-4">
-              {/* Info box */}
-              <div className="flex gap-3 rounded-xl border border-orange-100 bg-orange-50 p-3.5">
-                <div className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-orange-400">
-                  <span className="text-[10px] font-bold text-white">i</span>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-orange-700">
-                    Akses Karyawan
-                  </p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-orange-600">
-                    Karyawan hanya dapat mengakses POS, transaksi, dan data pelanggan.
-                  </p>
-                </div>
-              </div>
-
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   Email Karyawan
@@ -214,9 +199,6 @@ export default function LoginPage() {
                   placeholder="kasir@posmart.test"
                   className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                 />
-                <p className="mt-1.5 pl-0.5 text-xs text-gray-400">
-                  Minta kode toko kepada owner Anda
-                </p>
               </div>
 
               <div>

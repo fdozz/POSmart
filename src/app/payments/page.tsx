@@ -111,11 +111,6 @@ export default function PaymentsPage() {
         </button>
       </div>
 
-      <div className="mb-5 flex items-start gap-3 rounded-[20px] border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
-        <Info size={17} className="mt-0.5 flex-shrink-0" />
-        <p>Midtrans masih placeholder. Tombol simulasi mengubah status payment di backend dan mengaktifkan subscription.</p>
-      </div>
-
       {success && (
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
           <CheckCircle2 size={16} />

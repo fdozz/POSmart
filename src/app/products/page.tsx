@@ -2,10 +2,16 @@
 
 import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { getStatus, toProductView, type ProductCategory, type Product as ProductView } from "@/data/products";
-import { categoryService, inventoryService, outletService, productService } from "@/services";
+import {
+  getStatus,
+  toProductView,
+  type KnownProductCategory,
+  type ProductCategory,
+  type Product as ProductView,
+} from "@/data/products";
+import { categoryService, inventoryService, outletService, productService, supplierService } from "@/services";
 import { useSession } from "@/contexts/SessionContext";
-import type { Category, Inventory, Outlet, Product } from "@/types/posmart";
+import type { Category, Inventory, Outlet, Product, Supplier } from "@/types/posmart";
 import { Search, Plus, Pencil, Trash2, Package, ChevronDown, X } from "lucide-react";
 
 type CategoryFilter = "Semua" | "Minuman" | "Makanan" | "Snack" | "Retail";
@@ -26,6 +32,7 @@ const categoryColors: Record<ProductCategory, string> = {
   Makanan: "bg-blue-50 text-blue-500",
   Snack: "bg-green-50 text-green-600",
   Retail: "bg-purple-50 text-purple-500",
+  "Belum tersedia": "bg-gray-100 text-gray-500",
 };
 
 const categoryGradients: Record<ProductCategory, [string, string]> = {
@@ -33,25 +40,27 @@ const categoryGradients: Record<ProductCategory, [string, string]> = {
   Makanan: ["#E3F2FD", "#BBDEFB"],
   Snack: ["#E8F5E9", "#C8E6C9"],
   Retail: ["#F3E5F5", "#E1BEE7"],
+  "Belum tersedia": ["#F3F4F6", "#E5E7EB"],
 };
 
 const statusColors: Record<string, string> = {
   Aktif:   "bg-green-50 text-green-600",
   Menipis: "bg-yellow-50 text-yellow-600",
   Habis:   "bg-red-50 text-red-500",
+  "Belum tersedia": "bg-gray-100 text-gray-500",
 };
 
 type FormData = {
   name: string;
   sku: string;
-  category: ProductCategory;
+  category: KnownProductCategory | "";
   price: string;
   stock: string;
   description: string;
 };
 
 const emptyForm: FormData = {
-  name: "", sku: "", category: "Minuman", price: "", stock: "", description: "",
+  name: "", sku: "", category: "", price: "", stock: "", description: "",
 };
 
 function formatPrice(p: number) {
@@ -72,6 +81,7 @@ export default function ProductsPage() {
   const [inventory, setInventory]           = useState<Inventory[]>([]);
   const [categories, setCategories]         = useState<Category[]>([]);
   const [outlets, setOutlets]               = useState<Outlet[]>([]);
+  const [suppliers, setSuppliers]           = useState<Supplier[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -80,16 +90,25 @@ export default function ProductsPage() {
       inventoryService.list({ userId: currentUserId }),
       categoryService.list({ userId: currentUserId }),
       outletService.list({ userId: currentUserId }),
-    ]).then(([productResponse, inventoryResponse, categoryResponse, outletResponse]) => {
+      supplierService.list({ userId: currentUserId }),
+    ]).then(([productResponse, inventoryResponse, categoryResponse, outletResponse, supplierResponse]) => {
       if (!mounted) return;
       const nextProducts = productResponse.success && productResponse.data ? productResponse.data : [];
       const nextInventory = inventoryResponse.success && inventoryResponse.data ? inventoryResponse.data : [];
       const nextCategories = categoryResponse.success && categoryResponse.data ? categoryResponse.data : [];
+      const nextOutlets = outletResponse.success && outletResponse.data ? outletResponse.data : [];
+      const nextSuppliers = supplierResponse.success && supplierResponse.data ? supplierResponse.data : [];
       setDomainProducts(nextProducts);
       setInventory(nextInventory);
       setCategories(nextCategories);
-      if (outletResponse.success && outletResponse.data) setOutlets(outletResponse.data);
-      setProducts(nextProducts.map((product) => toProductView(product, nextInventory, nextCategories)));
+      setOutlets(nextOutlets);
+      setSuppliers(nextSuppliers);
+      setProducts(nextProducts.map((product) => toProductView(product, {
+        inventory: nextInventory,
+        categories: nextCategories,
+        suppliers: nextSuppliers,
+        outlets: nextOutlets,
+      })));
     });
     return () => {
       mounted = false;
@@ -101,8 +120,9 @@ export default function ProductsPage() {
     const menipis    = products.filter(p => getStatus(p.stock, p.minStock) === "Menipis").length;
     const habis      = products.filter(p => getStatus(p.stock, p.minStock) === "Habis").length;
     const categories = new Set(products.map(p => p.category)).size;
-    const totalStock = products.reduce((s, p) => s + p.stock, 0);
-    const minimumStock = products.length > 0 ? Math.min(...products.map(p => p.minStock)) : 0;
+    const totalStock = products.reduce((sum, product) => sum + (product.stock ?? 0), 0);
+    const recordedMinimums = products.flatMap((product) => product.minStock === null ? [] : [product.minStock]);
+    const minimumStock = recordedMinimums.length > 0 ? Math.min(...recordedMinimums) : null;
     return { aktif, menipis, habis, categories, totalStock, minimumStock };
   }, [products]);
 
@@ -127,9 +147,9 @@ export default function ProductsPage() {
     setForm({
       name: product.name,
       sku: product.sku,
-      category: product.category,
+      category: product.category === "Belum tersedia" ? "" : product.category,
       price: String(product.price),
-      stock: String(product.stock),
+      stock: product.stock === null ? "" : String(product.stock),
       description: "",
     });
   }
@@ -165,7 +185,12 @@ export default function ProductsPage() {
             : inventory;
           setInventory(nextInventory);
           setDomainProducts((current) => current.map((item) => item.productId === editingId ? response.data! : item));
-          setProducts((current) => current.map((item) => item.id === editingId ? toProductView(response.data!, nextInventory, categories) : item));
+          setProducts((current) => current.map((item) => item.id === editingId ? toProductView(response.data!, {
+            inventory: nextInventory,
+            categories,
+            suppliers,
+            outlets,
+          }) : item));
         });
       });
     } else {
@@ -173,20 +198,10 @@ export default function ProductsPage() {
       const selectedOutlet = outlets[0];
       const stock = parseInt(form.stock) || 0;
       const price = parseInt(form.price) || 0;
-      const newProduct = {
-        id:       `p-${Date.now()}`,
-        name:     form.name,
-        sku:      form.sku || `SKU-${products.length + 1}`,
-        category: form.category,
-        stock,
-        minStock: 5,
-        price,
-        sold:     0,
-      };
       void productService.create({
-        nama: newProduct.name,
-        sku: newProduct.sku,
-        harga: newProduct.price,
+        nama: form.name,
+        sku: form.sku || undefined,
+        harga: price,
         categoryId: selectedCategory?.categoryId,
         outletId: selectedOutlet?.outletId,
       }).then((response) => {
@@ -199,7 +214,12 @@ export default function ProductsPage() {
           const nextDomainProducts = [response.data!, ...domainProducts];
           setInventory(nextInventory);
           setDomainProducts(nextDomainProducts);
-          setProducts(nextDomainProducts.map((product) => toProductView(product, nextInventory, categories)));
+          setProducts(nextDomainProducts.map((product) => toProductView(product, {
+            inventory: nextInventory,
+            categories,
+            suppliers,
+            outlets,
+          })));
         });
       });
     }
@@ -283,7 +303,9 @@ export default function ProductsPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Min. Stok</span>
-              <span className="text-xs font-semibold text-gray-600">{stats.minimumStock} unit</span>
+              <span className="text-xs font-semibold text-gray-600">
+                {stats.minimumStock === null ? "Belum tersedia" : `${stats.minimumStock} unit`}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Status</span>
@@ -388,11 +410,14 @@ export default function ProductsPage() {
                           className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-xs font-bold text-gray-600"
                           style={{ background: `linear-gradient(135deg, ${gFrom}, ${gTo})` }}
                         >
-                          {product.sku.slice(0, 2)}
+                          {product.sku === "-" ? "PR" : product.sku.slice(0, 2)}
                         </div>
                         <div className="min-w-0">
                           <p className="truncate font-semibold leading-tight text-gray-800">{product.name}</p>
                           <p className="mt-0.5 text-xs text-gray-400">{product.sku}</p>
+                          <p className="mt-0.5 truncate text-[10px] text-gray-400">
+                            {product.supplier} • {product.outlet}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -403,11 +428,17 @@ export default function ProductsPage() {
                     </td>
                     <td className="px-4 py-3.5">
                       <span className={`font-semibold ${
-                        product.stock === 0 ? "text-red-500" : product.stock <= product.minStock ? "text-yellow-600" : "text-gray-800"
+                        product.stock === null
+                          ? "text-gray-400"
+                          : product.stock === 0
+                            ? "text-red-500"
+                            : product.minStock !== null && product.stock <= product.minStock
+                              ? "text-yellow-600"
+                              : "text-gray-800"
                       }`}>
-                        {product.stock}
+                        {product.stock ?? "-"}
                       </span>
-                      <span className="ml-1 text-xs text-gray-400">unit</span>
+                      {product.stock !== null && <span className="ml-1 text-xs text-gray-400">unit</span>}
                     </td>
                     {!showForm && (
                       <td className="px-4 py-3.5 font-semibold text-gray-800">
@@ -522,9 +553,10 @@ export default function ProductsPage() {
                   <div className="relative">
                     <select
                       value={form.category}
-                      onChange={e => setForm(f => ({ ...f, category: e.target.value as ProductCategory }))}
+                      onChange={e => setForm(f => ({ ...f, category: e.target.value as KnownProductCategory | "" }))}
                       className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-700 outline-none focus:border-orange-300"
                     >
+                      <option value="">Belum tersedia</option>
                       <option value="Minuman">Minuman</option>
                       <option value="Makanan">Makanan</option>
                       <option value="Snack">Snack</option>

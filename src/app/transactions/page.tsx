@@ -66,12 +66,17 @@ export default function TransactionsPage() {
       const detailResponses = await Promise.all(domainTransactions.map((transaction) => transactionService.detail(transaction.transactionId)));
       if (!mounted) return;
       const details = detailResponses.flatMap((response) => response.success && response.data ? response.data.details : []);
-      setTransactions(domainTransactions.map((transaction) => toTransactionView(transaction, { details, products, customers })));
+      setTransactions(domainTransactions.map((transaction) => toTransactionView(transaction, {
+        details,
+        products,
+        customers,
+        users: currentUser ? [currentUser] : [],
+      })));
     });
     return () => {
       mounted = false;
     };
-  }, [currentUser?.userId]);
+  }, [currentUser]);
 
   const stats = useMemo(() => {
     const sukses   = transactions.filter(t => t.status === "Sukses");
@@ -277,7 +282,9 @@ export default function TransactionsPage() {
                     </td>
                     {/* Produk */}
                     <td className="px-4 py-3.5">
-                      <span className="text-xs text-gray-600 line-clamp-1 max-w-[140px]">{tx.items[0]?.name}</span>
+                      <span className="text-xs text-gray-600 line-clamp-1 max-w-[140px]">
+                        {tx.items[0]?.name ?? "Detail item tidak tersedia"}
+                      </span>
                       {tx.itemCount > 1 && (
                         <span className="text-[10px] text-gray-400"> +{tx.itemCount - 1} lainnya</span>
                       )}

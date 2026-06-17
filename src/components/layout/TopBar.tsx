@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { Menu, Bell, Search, User, Settings, CreditCard, LogOut, ChevronRight, Shield } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
 import { roleLabels } from "@/lib/rbac";
-import type { UserRole } from "@/types/posmart";
 
 const MENU_ITEMS = [
   {
@@ -41,7 +40,7 @@ const MENU_ITEMS = [
 
 export default function TopBar() {
   const router = useRouter();
-  const { currentUser, currentRole, switchRole, logout } = useSession();
+  const { currentUser, currentRole, logout } = useSession();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const role = currentRole ?? "owner";
@@ -74,16 +73,6 @@ export default function TopBar() {
       </div>
 
       <div className="flex items-center gap-2.5">
-        <select
-          value={role}
-          onChange={(event) => switchRole(event.target.value as UserRole)}
-          className="rounded-lg bg-orange-50 px-3 py-1.5 text-sm font-semibold text-orange-500 outline-none"
-          aria-label="Ganti role untuk testing"
-        >
-          <option value="owner">Owner</option>
-          <option value="admin">Admin</option>
-          <option value="kasir">Kasir</option>
-        </select>
         <button className="relative flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100">
           <Bell size={17} />
           <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-orange-500" />

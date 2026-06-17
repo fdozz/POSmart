@@ -142,11 +142,6 @@ export default function SubscriptionPage() {
         </div>
       )}
 
-      <div className="mb-5 flex flex-wrap items-start gap-3 rounded-[20px] border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
-        <Info size={17} className="mt-0.5 flex-shrink-0" />
-        <p>Midtrans belum diintegrasikan. Basic dan Pro membuat payment record berstatus pending dalam mode mock, lalu dapat disimulasikan sukses di halaman Payments.</p>
-      </div>
-
       {loading ? (
         <LoadingState title="Memuat paket..." />
       ) : plans.length === 0 ? (
@@ -158,9 +153,8 @@ export default function SubscriptionPage() {
             return (
               <div
                 key={plan.paket}
-                className={`relative flex flex-col rounded-[20px] border-2 bg-white p-6 shadow-sm ${
-                  plan.recommended ? "border-[#FF6B00] shadow-orange-100" : "border-gray-100"
-                }`}
+                className={`relative flex flex-col rounded-[20px] border-2 bg-white p-6 shadow-sm ${plan.recommended ? "border-[#FF6B00] shadow-orange-100" : "border-gray-100"
+                  }`}
               >
                 {plan.recommended && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -189,13 +183,12 @@ export default function SubscriptionPage() {
                 <button
                   onClick={() => handleSelectPackage(plan.paket)}
                   disabled={selecting !== null}
-                  className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-colors ${
-                    isCurrent
+                  className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-colors ${isCurrent
                       ? "bg-orange-100 text-orange-500"
                       : plan.recommended
                         ? "bg-[#FF6B00] text-white hover:bg-[#E05E00]"
                         : "border-2 border-gray-200 text-gray-700 hover:bg-gray-50"
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   {isCurrent ? <Star size={14} /> : plan.price === 0 ? <Zap size={14} /> : <CreditCard size={14} />}
                   {selecting === plan.paket ? "Menyimpan..." : isCurrent ? "Pilih Ulang Paket" : "Pilih Paket"}

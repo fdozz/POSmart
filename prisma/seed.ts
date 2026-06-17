@@ -225,12 +225,15 @@ async function main() {
     },
   });
 
-  await prisma.notificationLog.create({
-    data: {
+  const lowStockDedupeKey = `${owner.userId}|${beans.productId}|${mainOutlet.outletId}|low_stock`;
+  await prisma.notificationLog.upsert({
+    where: { dedupeKey: lowStockDedupeKey },
+    update: {},
+    create: {
       userId: owner.userId,
       tipe: "low_stock",
       status: "sent",
-      dedupeKey: `${owner.userId}|${beans.productId}|${mainOutlet.outletId}|low_stock`,
+      dedupeKey: lowStockDedupeKey,
       pesan: "Stok Coffee Beans 250g mulai menipis di Kedai Kopi Senja - Pusat.",
     },
   });
